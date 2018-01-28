@@ -52,7 +52,6 @@ import org.apache.hc.core5.http.message.BasicClassicHttpRequest;
 import org.apache.hc.core5.http.message.BasicClassicHttpResponse;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.http.message.MessageSupport;
-import org.apache.hc.core5.util.ByteArrayBuffer;
 import org.apache.hc.core5.util.LangUtils;
 import org.junit.Assert;
 
@@ -85,6 +84,16 @@ public class HttpTestUtils {
         "User-Agent", "Vary" };
 
     /*
+     * "Entity-header fields define metainformation about the entity-body or,
+     * if no body is present, about the resource identified by the request."
+     *
+     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec7.html#sec7.1
+     */
+    public static final String[] ENTITY_HEADERS = { "Allow", "Content-Encoding",
+        "Content-Language", "Content-Length", "Content-Location", "Content-MD5",
+        "Content-Range", "Content-Type", "Expires", "Last-Modified" };
+
+    /*
      * Determines whether the given header name is considered a hop-by-hop
      * header.
      *
@@ -92,6 +101,18 @@ public class HttpTestUtils {
      */
     public static boolean isHopByHopHeader(final String name) {
         for (final String s : HOP_BY_HOP_HEADERS) {
+            if (s.equalsIgnoreCase(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /*
+     * Determines whether a given header name may appear multiple times.
+     */
+    public static boolean isMultiHeader(final String name) {
+        for (final String s : MULTI_HEADERS) {
             if (s.equalsIgnoreCase(name)) {
                 return true;
             }
@@ -220,13 +241,6 @@ public class HttpTestUtils {
         final byte[] bytes = new byte[nbytes];
         new Random().nextBytes(bytes);
         return bytes;
-    }
-
-    public static ByteArrayBuffer getRandomBuffer(final int nbytes) {
-        final ByteArrayBuffer buf = new ByteArrayBuffer(nbytes);
-        buf.setLength(nbytes);
-        new Random().nextBytes(buf.array());
-        return buf;
     }
 
     /** Generates a response body with random content.

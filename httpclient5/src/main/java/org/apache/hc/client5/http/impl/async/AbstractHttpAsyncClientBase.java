@@ -33,6 +33,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hc.core5.function.Supplier;
+import org.apache.hc.core5.http.ExceptionListener;
 import org.apache.hc.core5.http.nio.AsyncPushConsumer;
 import org.apache.hc.core5.io.ShutdownType;
 import org.apache.hc.core5.reactor.ConnectionInitiator;
@@ -40,17 +41,18 @@ import org.apache.hc.core5.reactor.DefaultConnectingIOReactor;
 import org.apache.hc.core5.reactor.ExceptionEvent;
 import org.apache.hc.core5.reactor.IOReactorStatus;
 import org.apache.hc.core5.util.TimeValue;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 abstract class AbstractHttpAsyncClientBase extends CloseableHttpAsyncClient {
 
     enum Status { READY, RUNNING, TERMINATED }
 
-    final Logger log = LoggerFactory.getLogger(getClass());
+    final Logger log = LogManager.getLogger(getClass());
 
     private final AsyncPushConsumerRegistry pushConsumerRegistry;
     private final DefaultConnectingIOReactor ioReactor;
+    private final ExceptionListener exceptionListener;
     private final ExecutorService executorService;
     private final AtomicReference<Status> status;
 
@@ -61,6 +63,14 @@ abstract class AbstractHttpAsyncClientBase extends CloseableHttpAsyncClient {
         super();
         this.ioReactor = ioReactor;
         this.pushConsumerRegistry = pushConsumerRegistry;
+        this.exceptionListener = new ExceptionListener() {
+
+            @Override
+            public void onError(final Exception ex) {
+                log.error(ex.getMessage(), ex);
+            }
+
+        };
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.status = new AtomicReference<>(Status.READY);
     }
@@ -72,7 +82,11 @@ abstract class AbstractHttpAsyncClientBase extends CloseableHttpAsyncClient {
 
                 @Override
                 public void run() {
-                    ioReactor.start();
+                    try {
+                        ioReactor.execute();
+                    } catch (final Exception ex) {
+                        exceptionListener.onError(ex);
+                    }
                 }
             });
         }
@@ -102,8 +116,8 @@ abstract class AbstractHttpAsyncClientBase extends CloseableHttpAsyncClient {
     }
 
     @Override
-    public final List<ExceptionEvent> getExceptionLog() {
-        return ioReactor.getExceptionLog();
+    public final List<ExceptionEvent> getAuditLog() {
+        return ioReactor.getAuditLog();
     }
 
     @Override

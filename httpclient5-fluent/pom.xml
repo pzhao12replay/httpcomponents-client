@@ -28,7 +28,7 @@
   <parent>
     <groupId>org.apache.httpcomponents.client5</groupId>
     <artifactId>httpclient5-parent</artifactId>
-    <version>5.0-beta2-SNAPSHOT</version>
+    <version>5.0-alpha3-SNAPSHOT</version>
   </parent>
   <artifactId>httpclient5-fluent</artifactId>
   <name>Apache HttpClient Fluent</name>
@@ -51,19 +51,15 @@
       <scope>test</scope>
       <classifier>tests</classifier>
     </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-      <scope>compile</scope>
-    </dependency>
+    <!-- direct dependency on logging -->
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-slf4j-impl</artifactId>
-      <scope>test</scope>
+      <artifactId>log4j-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
       <artifactId>log4j-core</artifactId>
+      <version>${log4j.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -71,6 +67,7 @@
       <artifactId>junit</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- TODO: does not appear to be needed; remove? -->
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
@@ -83,6 +80,7 @@
       <plugin>
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
+        <version>${hc.rat.version}</version>
         <executions>
           <execution>
             <phase>verify</phase>
@@ -116,6 +114,7 @@
 
       <plugin>
         <artifactId>maven-javadoc-plugin</artifactId>
+        <version>${hc.javadoc.version}</version>
         <configuration>
           <!-- reduce console output. Can override with -Dquiet=false -->
           <quiet>true</quiet>
@@ -137,6 +136,7 @@
 
       <plugin>
         <artifactId>maven-project-info-reports-plugin</artifactId>
+        <version>${hc.project-info.version}</version>
         <inherited>false</inherited>
         <reportSets>
           <reportSet>
@@ -151,10 +151,12 @@
 
       <plugin>
         <artifactId>maven-jxr-plugin</artifactId>
+        <version>${hc.jxr.version}</version>
       </plugin>
 
       <plugin>
         <artifactId>maven-surefire-report-plugin</artifactId>
+        <version>${hc.surefire-report.version}</version>
       </plugin>
 
     </plugins>

@@ -27,10 +27,10 @@
 
 package org.apache.hc.client5.http.examples;
 
-import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.sync.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.sync.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.sync.HttpClients;
+import org.apache.hc.client5.http.sync.methods.HttpGet;
 
 /**
  * This example demonstrates how to abort an HTTP method before its normal completion.
@@ -46,8 +46,8 @@ public class ClientAbortMethod {
                 System.out.println("----------------------------------------");
                 System.out.println(response.getCode() + " " + response.getReasonPhrase());
                 // Do not feel like reading the response body
-                // Call cancel on the request object
-                httpget.cancel();
+                // Call abort on the request object
+                httpget.abort();
             }
         }
     }

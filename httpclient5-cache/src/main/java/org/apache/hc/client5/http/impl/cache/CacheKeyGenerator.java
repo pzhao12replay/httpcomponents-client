@@ -29,6 +29,7 @@ package org.apache.hc.client5.http.impl.cache;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -38,63 +39,76 @@ import java.util.List;
 
 import org.apache.hc.client5.http.cache.HeaderConstants;
 import org.apache.hc.client5.http.cache.HttpCacheEntry;
+import org.apache.hc.client5.http.utils.URIUtils;
 import org.apache.hc.core5.annotation.Contract;
 import org.apache.hc.core5.annotation.ThreadingBehavior;
-import org.apache.hc.core5.function.Resolver;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HeaderElement;
 import org.apache.hc.core5.http.HttpHost;
 import org.apache.hc.core5.http.HttpRequest;
 import org.apache.hc.core5.http.message.MessageSupport;
+import org.apache.hc.core5.net.URIBuilder;
 
 /**
  * @since 4.1
  */
 @Contract(threading = ThreadingBehavior.IMMUTABLE)
-public class CacheKeyGenerator implements Resolver<URI, String> {
+class CacheKeyGenerator {
 
-    public static final CacheKeyGenerator INSTANCE = new CacheKeyGenerator();
+    private static final URI BASE_URI = URI.create("http://example.com/");
 
-    @Override
-    public String resolve(final URI uri) {
-        return generateKey(uri);
-    }
-
-    /**
-     * Computes a key for the given request {@link URI} that can be used as
-     * a unique identifier for cached resources. The URI is expected to
-     * in an absolute form.
-     *
-     * @param requestUri request URI
-     * @return cache key
-     */
-    public String generateKey(final URI requestUri) {
-        try {
-            final URI normalizeRequestUri = HttpCacheSupport.normalize(requestUri);
-            return normalizeRequestUri.toASCIIString();
-        } catch (final URISyntaxException ex) {
-            return requestUri.toASCIIString();
+    private URI normalize(final URI uri) throws URISyntaxException {
+        final URIBuilder builder = new URIBuilder(URIUtils.resolve(BASE_URI, uri)) ;
+        if (builder.getHost() != null) {
+            if (builder.getScheme() == null) {
+                builder.setScheme("http");
+            }
+            if (builder.getPort() == -1) {
+                if ("http".equalsIgnoreCase(builder.getScheme())) {
+                    builder.setPort(80);
+                } else if ("https".equalsIgnoreCase(builder.getScheme())) {
+                    builder.setPort(443);
+                }
+            }
         }
+        if (builder.getPath() == null) {
+            builder.setPath("/");
+        }
+        return builder.build();
     }
 
     /**
-     * Computes a key for the given {@link HttpHost} and {@link HttpRequest}
-     * that can be used as a unique identifier for cached resources.
+     * For a given {@link HttpHost} and {@link HttpRequest} get a URI from the
+     * pair that I can use as an identifier KEY into my HttpCache
      *
      * @param host The host for this request
-     * @param request the {@link HttpRequest}
-     * @return cache key
+     * @param req the {@link HttpRequest}
+     * @return String the extracted URI
      */
-    public String generateKey(final HttpHost host, final HttpRequest request) {
-        final String s = HttpCacheSupport.getRequestUri(request, host);
+    public String generateKey(final HttpHost host, final HttpRequest req) {
         try {
-            return generateKey(new URI(s));
+            URI uri = req.getUri();
+            if (!uri.isAbsolute()) {
+                uri = URIUtils.rewriteURI(uri, host);
+            }
+            return normalize(uri).toASCIIString();
         } catch (final URISyntaxException ex) {
-            return s;
+            return req.getRequestUri();
         }
     }
 
-    private String getFullHeaderValue(final Header[] headers) {
+    public String generateKey(final URL url) {
+        if (url == null) {
+            return null;
+        }
+        try {
+            return normalize(url.toURI()).toASCIIString();
+        } catch (final URISyntaxException ex) {
+            return url.toString();
+        }
+    }
+
+    protected String getFullHeaderValue(final Header[] headers) {
         if (headers == null) {
             return "";
         }
@@ -110,30 +124,30 @@ public class CacheKeyGenerator implements Resolver<URI, String> {
     }
 
     /**
-     * Computes a key for the given {@link HttpHost} and {@link HttpRequest}
-     * that can be used as a unique identifier for cached resources. if the request has a
-     * {@literal VARY} header the identifier will also include variant key.
+     * For a given {@link HttpHost} and {@link HttpRequest} if the request has a
+     * VARY header - I need to get an additional URI from the pair of host and
+     * request so that I can also store the variant into my HttpCache.
      *
      * @param host The host for this request
-     * @param request the {@link HttpRequest}
+     * @param req the {@link HttpRequest}
      * @param entry the parent entry used to track the variants
-     * @return cache key
+     * @return String the extracted variant URI
      */
-    public String generateKey(final HttpHost host, final HttpRequest request, final HttpCacheEntry entry) {
+    public String generateVariantURI(final HttpHost host, final HttpRequest req, final HttpCacheEntry entry) {
         if (!entry.hasVariants()) {
-            return generateKey(host, request);
+            return generateKey(host, req);
         }
-        return generateVariantKey(request, entry) + generateKey(host, request);
+        return generateVariantKey(req, entry) + generateKey(host, req);
     }
 
     /**
-     * Computes a "variant key" from the headers of a given request that are
+     * Compute a "variant key" from the headers of a given request that are
      * covered by the Vary header of a given cache entry. Any request whose
      * varying headers match those of this request should have the same
      * variant key.
      * @param req originating request
      * @param entry cache entry in question that has variants
-     * @return variant key
+     * @return a {@code String} variant key
      */
     public String generateVariantKey(final HttpRequest req, final HttpCacheEntry entry) {
         final List<String> variantHeaderNames = new ArrayList<>();

@@ -27,19 +27,16 @@
 package org.apache.hc.client5.http.impl.cache;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.lang.ref.ReferenceQueue;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hc.client5.http.cache.HttpCacheEntry;
 import org.apache.hc.client5.http.cache.HttpCacheStorage;
-import org.apache.hc.client5.http.cache.HttpCacheCASOperation;
+import org.apache.hc.client5.http.cache.HttpCacheUpdateCallback;
 import org.apache.hc.client5.http.cache.Resource;
-import org.apache.hc.client5.http.cache.ResourceIOException;
 import org.apache.hc.core5.annotation.Contract;
 import org.apache.hc.core5.annotation.ThreadingBehavior;
 import org.apache.hc.core5.util.Args;
@@ -106,7 +103,7 @@ public class ManagedHttpCacheStorage implements HttpCacheStorage, Closeable {
     }
 
     @Override
-    public void putEntry(final String url, final HttpCacheEntry entry) throws ResourceIOException {
+    public void putEntry(final String url, final HttpCacheEntry entry) throws IOException {
         Args.notNull(url, "URL");
         Args.notNull(entry, "Cache entry");
         ensureValidState();
@@ -117,7 +114,7 @@ public class ManagedHttpCacheStorage implements HttpCacheStorage, Closeable {
     }
 
     @Override
-    public HttpCacheEntry getEntry(final String url) throws ResourceIOException {
+    public HttpCacheEntry getEntry(final String url) throws IOException {
         Args.notNull(url, "URL");
         ensureValidState();
         synchronized (this) {
@@ -126,7 +123,7 @@ public class ManagedHttpCacheStorage implements HttpCacheStorage, Closeable {
     }
 
     @Override
-    public void removeEntry(final String url) throws ResourceIOException {
+    public void removeEntry(final String url) throws IOException {
         Args.notNull(url, "URL");
         ensureValidState();
         synchronized (this) {
@@ -139,31 +136,18 @@ public class ManagedHttpCacheStorage implements HttpCacheStorage, Closeable {
     @Override
     public void updateEntry(
             final String url,
-            final HttpCacheCASOperation casOperation) throws ResourceIOException {
+            final HttpCacheUpdateCallback callback) throws IOException {
         Args.notNull(url, "URL");
-        Args.notNull(casOperation, "CAS operation");
+        Args.notNull(callback, "Callback");
         ensureValidState();
         synchronized (this) {
             final HttpCacheEntry existing = this.entries.get(url);
-            final HttpCacheEntry updated = casOperation.execute(existing);
+            final HttpCacheEntry updated = callback.update(existing);
             this.entries.put(url, updated);
             if (existing != updated) {
                 keepResourceReference(updated);
             }
         }
-    }
-
-    @Override
-    public Map<String, HttpCacheEntry> getEntries(final Collection<String> keys) throws ResourceIOException {
-        Args.notNull(keys, "Key");
-        final Map<String, HttpCacheEntry> resultMap = new HashMap<>(keys.size());
-        for (final String key: keys) {
-            final HttpCacheEntry entry = getEntry(key);
-            if (entry != null) {
-                resultMap.put(key, entry);
-            }
-        }
-        return resultMap;
     }
 
     public void cleanResources() {

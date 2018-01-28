@@ -37,7 +37,14 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.NoSuchElementException;
 
+import javax.naming.InvalidNameException;
+import javax.naming.NamingException;
+import javax.naming.directory.Attribute;
+import javax.naming.directory.Attributes;
+import javax.naming.ldap.LdapName;
+import javax.naming.ldap.Rdn;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import javax.net.ssl.SSLSession;
@@ -47,11 +54,9 @@ import org.apache.hc.client5.http.psl.DomainType;
 import org.apache.hc.client5.http.psl.PublicSuffixMatcher;
 import org.apache.hc.core5.annotation.Contract;
 import org.apache.hc.core5.annotation.ThreadingBehavior;
-import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.net.InetAddressUtils;
-import org.apache.hc.core5.util.TextUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Default {@link javax.net.ssl.HostnameVerifier} implementation.
@@ -73,7 +78,7 @@ public final class DefaultHostnameVerifier implements HttpClientHostnameVerifier
 
     }
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private final Logger log = LogManager.getLogger(getClass());
 
     private final PublicSuffixMatcher publicSuffixMatcher;
 
@@ -250,16 +255,28 @@ public final class DefaultHostnameVerifier implements HttpClientHostnameVerifier
         if (subjectPrincipal == null) {
             return null;
         }
-        final List<NameValuePair> attributes = DistinguishedNameParser.INSTANCE.parse(subjectPrincipal);
-        for (final NameValuePair attribute: attributes) {
-            if (TextUtils.isBlank(attribute.getName()) || attribute.getValue() == null) {
-                throw new SSLException(subjectPrincipal + " is not a valid X500 distinguished name");
+        try {
+            final LdapName subjectDN = new LdapName(subjectPrincipal);
+            final List<Rdn> rdns = subjectDN.getRdns();
+            for (int i = rdns.size() - 1; i >= 0; i--) {
+                final Rdn rds = rdns.get(i);
+                final Attributes attributes = rds.toAttributes();
+                final Attribute cn = attributes.get("cn");
+                if (cn != null) {
+                    try {
+                        final Object value = cn.get();
+                        if (value != null) {
+                            return value.toString();
+                        }
+                    } catch (NoSuchElementException | NamingException ignore) {
+                        // ignore exception
+                    }
+                }
             }
-            if (attribute.getName().equalsIgnoreCase("cn")) {
-                return attribute.getValue();
-            }
+            return null;
+        } catch (final InvalidNameException e) {
+            throw new SSLException(subjectPrincipal + " is not a valid X500 distinguished name");
         }
-        return null;
     }
 
     static HostNameType determineHostFormat(final String host) {

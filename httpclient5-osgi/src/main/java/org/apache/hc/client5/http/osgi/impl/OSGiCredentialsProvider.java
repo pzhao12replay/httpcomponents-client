@@ -35,15 +35,15 @@ import org.apache.hc.client5.http.auth.NTCredentials;
 import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
 import org.apache.hc.client5.http.osgi.services.ProxyConfiguration;
 import org.apache.hc.core5.http.protocol.HttpContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * @since 4.3
  */
 final class OSGiCredentialsProvider implements CredentialsStore {
 
-    private static final Logger log = LoggerFactory.getLogger(OSGiCredentialsProvider.class);
+    private static final Logger log = LogManager.getLogger(OSGiCredentialsProvider.class);
 
     private static final int HOST_AND_PORT_MATCH = 12;
 
@@ -73,7 +73,7 @@ final class OSGiCredentialsProvider implements CredentialsStore {
         // iterate over all active proxy configurations at the moment of getting the credential
         for (final ProxyConfiguration config : proxyConfigurations) {
             if (config.isEnabled() && isSuitable(config, authScope)) {
-                final String scheme = authScope.getAuthScheme();
+                final String scheme = authScope.getScheme();
                 if (BASIC_SCHEME_NAME.equals(scheme)) {
                     return new UsernamePasswordCredentials(config.getUsername(), config.getPassword().toCharArray());
                 } else if (NTLM_SCHEME_NAME.equals(scheme)) {

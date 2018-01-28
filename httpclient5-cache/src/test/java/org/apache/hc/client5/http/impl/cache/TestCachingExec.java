@@ -44,10 +44,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
 import org.apache.hc.client5.http.cache.HttpCacheEntry;
-import org.apache.hc.client5.http.classic.ExecChain;
-import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.sync.ExecChain;
+import org.apache.hc.client5.http.sync.methods.HttpGet;
 import org.apache.hc.client5.http.utils.DateUtils;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.ClassicHttpResponse;
@@ -92,7 +91,7 @@ public class TestCachingExec extends TestCachingExecChain {
     public void setUp() {
         super.setUp();
 
-        scope = new ExecChain.Scope("test", route, request, mockEndpoint, context);
+        scope = new ExecChain.Scope(route, request, mockEndpoint, context);
         mockBackendResponse = createNiceMock(ClassicHttpResponse.class);
 
         requestDate = new Date(System.currentTimeMillis() - 1000);
@@ -106,11 +105,10 @@ public class TestCachingExec extends TestCachingExecChain {
             final CachedHttpResponseGenerator mockResponseGenerator,
             final CacheableRequestPolicy mockRequestPolicy,
             final CachedResponseSuitabilityChecker mockSuitabilityChecker,
+            final ConditionalRequestBuilder mockConditionalRequestBuilder,
             final ResponseProtocolCompliance mockResponseProtocolCompliance,
             final RequestProtocolCompliance mockRequestProtocolCompliance,
-            final DefaultCacheRevalidator mockCacheRevalidator,
-            final ConditionalRequestBuilder<ClassicHttpRequest> mockConditionalRequestBuilder,
-            final CacheConfig config) {
+            final CacheConfig config, final AsynchronousValidator asyncValidator) {
         return impl = new CachingExec(
                 mockCache,
                 mockValidityPolicy,
@@ -118,16 +116,16 @@ public class TestCachingExec extends TestCachingExecChain {
                 mockResponseGenerator,
                 mockRequestPolicy,
                 mockSuitabilityChecker,
+                mockConditionalRequestBuilder,
                 mockResponseProtocolCompliance,
                 mockRequestProtocolCompliance,
-                mockCacheRevalidator,
-                mockConditionalRequestBuilder,
-                config);
+                config,
+                asyncValidator);
     }
 
     @Override
     public CachingExec createCachingExecChain(final HttpCache cache, final CacheConfig config) {
-        return impl = new CachingExec(cache, null, config);
+        return impl = new CachingExec(cache, config);
     }
 
     @Override
@@ -168,6 +166,7 @@ public class TestCachingExec extends TestCachingExecChain {
     @Test
     public void testCacheMissCausesBackendRequest() throws Exception {
         mockImplMethods(CALL_BACKEND);
+        cacheInvalidatorWasCalled();
         requestPolicyAllowsCaching(true);
         getCacheEntryReturns(null);
         getVariantCacheEntriesReturns(new HashMap<String,Variant>());
@@ -189,6 +188,7 @@ public class TestCachingExec extends TestCachingExecChain {
     @Test
     public void testUnsuitableUnvalidatableCacheEntryCausesBackendRequest() throws Exception {
         mockImplMethods(CALL_BACKEND);
+        cacheInvalidatorWasCalled();
         requestPolicyAllowsCaching(true);
         requestIsFatallyNonCompliant(null);
 
@@ -214,6 +214,7 @@ public class TestCachingExec extends TestCachingExecChain {
     @Test
     public void testUnsuitableValidatableCacheEntryCausesRevalidation() throws Exception {
         mockImplMethods(REVALIDATE_CACHE_ENTRY);
+        cacheInvalidatorWasCalled();
         requestPolicyAllowsCaching(true);
         requestIsFatallyNonCompliant(null);
 
@@ -292,7 +293,7 @@ public class TestCachingExec extends TestCachingExecChain {
                 eq(responseDate)))
             .andReturn(updatedEntry);
         expect(mockSuitabilityChecker.isConditional(request)).andReturn(false);
-        responseIsGeneratedFromCache(SimpleHttpResponse.create(HttpStatus.SC_OK));
+        responseIsGeneratedFromCache();
 
         replayMocks();
         impl.revalidateCacheEntry(host, request, scope, mockExecChain, entry);
@@ -388,23 +389,6 @@ public class TestCachingExec extends TestCachingExecChain {
         verifyMocks();
     }
 
-    @Test
-    public void testDoesNotFlushCachesOnCacheHit() throws Exception {
-        requestPolicyAllowsCaching(true);
-        requestIsFatallyNonCompliant(null);
-
-        getCacheEntryReturns(mockCacheEntry);
-        doesNotFlushCache();
-        cacheEntrySuitable(true);
-        cacheEntryValidatable(true);
-
-        responseIsGeneratedFromCache(SimpleHttpResponse.create(HttpStatus.SC_OK));
-
-        replayMocks();
-        impl.execute(request, scope, mockExecChain);
-        verifyMocks();
-    }
-
     private IExpectationSetters<ClassicHttpResponse> implExpectsAnyRequestAndReturn(
             final ClassicHttpResponse response) throws Exception {
         final ClassicHttpResponse resp = impl.callBackend(
@@ -420,7 +404,9 @@ public class TestCachingExec extends TestCachingExecChain {
     }
 
     private void cacheInvalidatorWasCalled()  throws IOException {
-        mockCache.flushCacheEntriesInvalidatedByRequest((HttpHost)anyObject(), (HttpRequest)anyObject());
+        mockCache.flushInvalidatedCacheEntriesFor(
+                (HttpHost)anyObject(),
+                (HttpRequest)anyObject());
     }
 
     private void getCurrentDateReturns(final Date date) {
@@ -448,11 +434,11 @@ public class TestCachingExec extends TestCachingExecChain {
                 mockResponseGenerator,
                 mockRequestPolicy,
                 mockSuitabilityChecker,
+                mockConditionalRequestBuilder,
                 mockResponseProtocolCompliance,
                 mockRequestProtocolCompliance,
-                mockCacheRevalidator,
-                mockConditionalRequestBuilder,
-                config).addMockedMethods(methods).createNiceMock();
+                config,
+                asyncValidator).addMockedMethods(methods).createNiceMock();
     }
 
 }

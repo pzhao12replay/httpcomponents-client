@@ -44,8 +44,8 @@ import org.apache.hc.core5.http.HttpRequest;
 import org.apache.hc.core5.http.protocol.HttpContext;
 import org.apache.hc.core5.net.URIAuthority;
 import org.apache.hc.core5.util.Args;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import com.sun.jna.platform.win32.Secur32;
 import com.sun.jna.platform.win32.Secur32Util;
@@ -71,7 +71,7 @@ import com.sun.jna.ptr.IntByReference;
  */
 public class WindowsNegotiateScheme implements AuthScheme {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private final Logger log = LogManager.getLogger(getClass());
 
     // NTLM or Negotiate
     private final String scheme;
@@ -111,6 +111,12 @@ public class WindowsNegotiateScheme implements AuthScheme {
         continueNeeded = true; // waiting
         clientCred = null;
         sspiContext = null;
+    }
+
+    @Override
+    public void finalize() throws Throwable {
+        dispose();
+        super.finalize();
     }
 
     @Override

@@ -29,7 +29,6 @@ package org.apache.hc.client5.http.auth.util;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
-import org.apache.hc.client5.http.auth.ByteArrayBuilder;
 import org.junit.Assert;
 import org.junit.Test;
 

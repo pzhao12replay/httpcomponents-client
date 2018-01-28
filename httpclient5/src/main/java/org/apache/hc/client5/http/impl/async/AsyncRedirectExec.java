@@ -28,10 +28,9 @@ package org.apache.hc.client5.http.impl.async;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.List;
 
-import org.apache.hc.client5.http.CircularRedirectException;
 import org.apache.hc.client5.http.HttpRoute;
-import org.apache.hc.client5.http.RedirectException;
 import org.apache.hc.client5.http.StandardMethods;
 import org.apache.hc.client5.http.async.AsyncExecCallback;
 import org.apache.hc.client5.http.async.AsyncExecChain;
@@ -40,7 +39,7 @@ import org.apache.hc.client5.http.auth.AuthExchange;
 import org.apache.hc.client5.http.auth.AuthScheme;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
-import org.apache.hc.client5.http.protocol.RedirectLocations;
+import org.apache.hc.client5.http.protocol.RedirectException;
 import org.apache.hc.client5.http.protocol.RedirectStrategy;
 import org.apache.hc.client5.http.routing.HttpRoutePlanner;
 import org.apache.hc.client5.http.utils.URIUtils;
@@ -54,13 +53,12 @@ import org.apache.hc.core5.http.ProtocolException;
 import org.apache.hc.core5.http.message.BasicHttpRequest;
 import org.apache.hc.core5.http.nio.AsyncDataConsumer;
 import org.apache.hc.core5.http.nio.AsyncEntityProducer;
-import org.apache.hc.core5.util.LangUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 class AsyncRedirectExec implements AsyncExecChainHandler {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private final Logger log = LogManager.getLogger(getClass());
 
     private final HttpRoutePlanner routePlanner;
     private final RedirectStrategy redirectStrategy;
@@ -77,7 +75,6 @@ class AsyncRedirectExec implements AsyncExecChainHandler {
         volatile int redirectCount;
         volatile HttpRequest currentRequest;
         volatile AsyncEntityProducer currentEntityProducer;
-        volatile RedirectLocations redirectLocations;
         volatile AsyncExecChain.Scope currentScope;
         volatile boolean reroute;
 
@@ -110,16 +107,6 @@ class AsyncRedirectExec implements AsyncExecChainHandler {
                     state.redirectCount++;
 
                     final URI redirectUri = redirectStrategy.getLocationURI(request, response, clientContext);
-                    if (log.isDebugEnabled()) {
-                        log.debug("Redirect requested to location '" + redirectUri + "'");
-                    }
-                    if (!config.isCircularRedirectsAllowed()) {
-                        if (state.redirectLocations.contains(redirectUri)) {
-                            throw new CircularRedirectException("Circular redirect to '" + redirectUri + "'");
-                        }
-                    }
-                    state.redirectLocations.add(redirectUri);
-
                     final int statusCode = response.getCode();
 
                     switch (statusCode) {
@@ -141,27 +128,27 @@ class AsyncRedirectExec implements AsyncExecChainHandler {
                         throw new ProtocolException("Redirect URI does not specify a valid host name: " + redirectUri);
                     }
 
-                    state.reroute = false;
-                    state.redirectURI = redirectUri;
-
-                    if (!LangUtils.equals(currentRoute.getTargetHost(), newTarget)) {
-                        final HttpRoute newRoute = routePlanner.determineRoute(newTarget, clientContext);
-                        if (!LangUtils.equals(currentRoute, newRoute)) {
-                            state.reroute = true;
-                            final AuthExchange targetAuthExchange = clientContext.getAuthExchange(currentRoute.getTargetHost());
-                            log.debug("Resetting target auth state");
-                            targetAuthExchange.reset();
-                            if (currentRoute.getProxyHost() != null) {
-                                final AuthExchange proxyAuthExchange = clientContext.getAuthExchange(currentRoute.getProxyHost());
-                                final AuthScheme authScheme = proxyAuthExchange.getAuthScheme();
-                                if (authScheme != null && authScheme.isConnectionBased()) {
-                                    log.debug("Resetting proxy auth state");
-                                    proxyAuthExchange.reset();
-                                }
+                    if (!currentRoute.getTargetHost().equals(newTarget)) {
+                        log.debug("New route required");
+                        state.reroute = true;
+                        final AuthExchange targetAuthExchange = clientContext.getAuthExchange(currentRoute.getTargetHost());
+                        log.debug("Resetting target auth state");
+                        targetAuthExchange.reset();
+                        if (currentRoute.getProxyHost() != null) {
+                            final AuthExchange proxyAuthExchange = clientContext.getAuthExchange(currentRoute.getProxyHost());
+                            final AuthScheme authScheme = proxyAuthExchange.getAuthScheme();
+                            if (authScheme != null && authScheme.isConnectionBased()) {
+                                log.debug("Resetting proxy auth state");
+                                proxyAuthExchange.reset();
                             }
-                            state.currentScope = new AsyncExecChain.Scope(scope.exchangeId, newRoute,
-                                    scope.originalRequest, scope.cancellableDependency, clientContext, scope.execRuntime);
                         }
+                        final HttpRoute newRoute = routePlanner.determineRoute(newTarget, clientContext);
+                        state.currentScope = new AsyncExecChain.Scope(
+                                scope.exchangeId, newRoute, scope.originalRequest, clientContext, scope.execRuntime);
+                        state.redirectURI = redirectUri;
+                    } else {
+                        state.reroute = false;
+                        state.redirectURI = redirectUri;
                     }
                 }
                 if (state.redirectURI != null) {
@@ -179,19 +166,13 @@ class AsyncRedirectExec implements AsyncExecChainHandler {
                 if (state.redirectURI == null) {
                     asyncExecCallback.completed();
                 } else {
-                    final AsyncEntityProducer entityProducer = state.currentEntityProducer;
-                    if (entityProducer != null && !entityProducer.isRepeatable()) {
-                        log.debug("Cannot redirect non-repeatable request");
-                        asyncExecCallback.completed();
-                    } else {
-                        try {
-                            if (state.reroute) {
-                                scope.execRuntime.releaseConnection();
-                            }
-                            internalExecute(state, chain, asyncExecCallback);
-                        } catch (final IOException | HttpException ex) {
-                            asyncExecCallback.failed(ex);
+                    try {
+                        if (state.reroute) {
+                            scope.execRuntime.releaseConnection();
                         }
+                        internalExecute(state, chain, asyncExecCallback);
+                    } catch (IOException | HttpException ex) {
+                        asyncExecCallback.failed(ex);
                     }
                 }
             }
@@ -213,13 +194,10 @@ class AsyncRedirectExec implements AsyncExecChainHandler {
             final AsyncExecChain chain,
             final AsyncExecCallback asyncExecCallback) throws HttpException, IOException {
         final HttpClientContext clientContext = scope.clientContext;
-        RedirectLocations redirectLocations = clientContext.getRedirectLocations();
-        if (redirectLocations == null) {
-            redirectLocations = new RedirectLocations();
-            clientContext.setAttribute(HttpClientContext.REDIRECT_LOCATIONS, redirectLocations);
+        final List<URI> redirectLocations = clientContext.getRedirectLocations();
+        if (redirectLocations != null) {
+            redirectLocations.clear();
         }
-        redirectLocations.clear();
-
         final RequestConfig config = clientContext.getRequestConfig();
 
         final State state = new State();
@@ -227,7 +205,6 @@ class AsyncRedirectExec implements AsyncExecChainHandler {
         state.redirectCount = 0;
         state.currentRequest = request;
         state.currentEntityProducer = entityProducer;
-        state.redirectLocations = redirectLocations;
         state.currentScope = scope;
 
         internalExecute(state, chain, asyncExecCallback);

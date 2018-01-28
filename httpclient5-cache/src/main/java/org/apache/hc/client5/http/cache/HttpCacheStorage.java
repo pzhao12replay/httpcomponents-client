@@ -26,13 +26,12 @@
  */
 package org.apache.hc.client5.http.cache;
 
-import java.util.Collection;
-import java.util.Map;
+import java.io.IOException;
 
 /**
- * {@literal HttpCacheStorage} represents an abstract HTTP cache
- * storage backend that can then be plugged into the classic
- * (blocking) request execution pipeline.
+ * New storage backends should implement this {@link HttpCacheStorage}
+ * interface. They can then be plugged into the existing caching
+ * {@link org.apache.hc.client5.http.sync.HttpClient} implementation.
  *
  * @since 4.1
  */
@@ -42,9 +41,9 @@ public interface HttpCacheStorage {
      * Store a given cache entry under the given key.
      * @param key where in the cache to store the entry
      * @param entry cached response to store
-     * @throws ResourceIOException
+     * @throws IOException
      */
-    void putEntry(String key, HttpCacheEntry entry) throws ResourceIOException;
+    void putEntry(String key, HttpCacheEntry entry) throws IOException;
 
     /**
      * Retrieves the cache entry stored under the given key
@@ -52,39 +51,30 @@ public interface HttpCacheStorage {
      * @param key cache key
      * @return an {@link HttpCacheEntry} or {@code null} if no
      *   entry exists
-     * @throws ResourceIOException
+     * @throws IOException
      */
-    HttpCacheEntry getEntry(String key) throws ResourceIOException;
+    HttpCacheEntry getEntry(String key) throws IOException;
 
     /**
      * Deletes/invalidates/removes any cache entries currently
      * stored under the given key.
      * @param key
-     * @throws ResourceIOException
+     * @throws IOException
      */
-    void removeEntry(String key) throws ResourceIOException;
+    void removeEntry(String key) throws IOException;
 
     /**
      * Atomically applies the given callback to processChallenge an existing cache
      * entry under a given key.
      * @param key indicates which entry to modify
-     * @param casOperation the CAS operation to perform.
-     * @throws ResourceIOException
+     * @param callback performs the processChallenge; see
+     *   {@link HttpCacheUpdateCallback} for details, but roughly the
+     *   callback expects to be handed the current entry and will return
+     *   the new value for the entry.
+     * @throws IOException
      * @throws HttpCacheUpdateException
      */
     void updateEntry(
-            String key, HttpCacheCASOperation casOperation) throws ResourceIOException, HttpCacheUpdateException;
-
-
-    /**
-     * Retrieves multiple cache entries stored under the given keys. Some implementations
-     * may use a single bulk operation to do the retrieval.
-     *
-     * @param keys cache keys
-     * @return an map of {@link HttpCacheEntry}s.
-     *
-     * @since 5.0
-     */
-    Map<String, HttpCacheEntry> getEntries(Collection<String> keys) throws ResourceIOException;
+            String key, HttpCacheUpdateCallback callback) throws IOException, HttpCacheUpdateException;
 
 }

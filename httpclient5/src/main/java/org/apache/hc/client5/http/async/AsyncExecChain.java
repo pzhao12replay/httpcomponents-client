@@ -30,7 +30,6 @@ import java.io.IOException;
 
 import org.apache.hc.client5.http.HttpRoute;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
-import org.apache.hc.core5.concurrent.CancellableDependency;
 import org.apache.hc.core5.http.HttpException;
 import org.apache.hc.core5.http.HttpRequest;
 import org.apache.hc.core5.http.nio.AsyncEntityProducer;
@@ -43,23 +42,20 @@ public interface AsyncExecChain {
         public final String exchangeId;
         public final HttpRoute route;
         public final HttpRequest originalRequest;
-        public final CancellableDependency cancellableDependency;
-        public final HttpClientContext clientContext;
         public final AsyncExecRuntime execRuntime;
+        public final HttpClientContext clientContext;
 
         public Scope(
                 final String exchangeId,
                 final HttpRoute route,
                 final HttpRequest originalRequest,
-                final CancellableDependency cancellableDependency,
                 final HttpClientContext clientContext,
                 final AsyncExecRuntime execRuntime) {
             this.exchangeId = Args.notBlank(exchangeId, "Exchange id");
             this.route = Args.notNull(route, "Route");
             this.originalRequest = Args.notNull(originalRequest, "Original request");
-            this.cancellableDependency = Args.notNull(cancellableDependency, "Dependency");
-            this.clientContext = clientContext != null ? clientContext : HttpClientContext.create();
             this.execRuntime = Args.notNull(execRuntime, "Exec runtime");
+            this.clientContext = clientContext != null ? clientContext : HttpClientContext.create();
         }
 
     }

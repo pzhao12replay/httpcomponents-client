@@ -26,11 +26,11 @@
  */
 package org.apache.hc.client5.http.examples;
 
-import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.client5.http.impl.sync.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.sync.CloseableHttpResponse;
+import org.apache.hc.client5.http.impl.sync.HttpClients;
+import org.apache.hc.client5.http.sync.methods.HttpGet;
 import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.protocol.BasicHttpContext;
@@ -43,7 +43,7 @@ import org.apache.hc.core5.http.protocol.HttpContext;
 public class ClientMultiThreadedExecution {
 
     public static void main(final String[] args) throws Exception {
-        // Create an HttpClient with the PoolingHttpClientConnectionManager.
+        // Create an HttpClient with the ThreadSafeClientConnManager.
         // This connection manager must be used if more than one thread will
         // be using the HttpClient.
         final PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager();

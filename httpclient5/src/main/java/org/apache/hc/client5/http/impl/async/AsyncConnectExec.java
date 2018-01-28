@@ -30,7 +30,6 @@ package org.apache.hc.client5.http.impl.async;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 
-import org.apache.hc.client5.http.AuthenticationStrategy;
 import org.apache.hc.client5.http.HttpRoute;
 import org.apache.hc.client5.http.RouteTracker;
 import org.apache.hc.client5.http.async.AsyncExecCallback;
@@ -40,14 +39,14 @@ import org.apache.hc.client5.http.async.AsyncExecRuntime;
 import org.apache.hc.client5.http.auth.AuthExchange;
 import org.apache.hc.client5.http.auth.ChallengeType;
 import org.apache.hc.client5.http.config.RequestConfig;
-import org.apache.hc.client5.http.impl.TunnelRefusedException;
 import org.apache.hc.client5.http.impl.auth.HttpAuthenticator;
 import org.apache.hc.client5.http.impl.routing.BasicRouteDirector;
+import org.apache.hc.client5.http.impl.sync.TunnelRefusedException;
+import org.apache.hc.client5.http.protocol.AuthenticationStrategy;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
 import org.apache.hc.client5.http.routing.HttpRouteDirector;
 import org.apache.hc.core5.annotation.Contract;
 import org.apache.hc.core5.annotation.ThreadingBehavior;
-import org.apache.hc.core5.concurrent.CancellableDependency;
 import org.apache.hc.core5.concurrent.FutureCallback;
 import org.apache.hc.core5.http.EntityDetails;
 import org.apache.hc.core5.http.HttpException;
@@ -63,8 +62,8 @@ import org.apache.hc.core5.http.nio.AsyncEntityProducer;
 import org.apache.hc.core5.http.protocol.HttpCoreContext;
 import org.apache.hc.core5.http.protocol.HttpProcessor;
 import org.apache.hc.core5.util.Args;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Request executor in the HTTP request execution chain
@@ -76,7 +75,7 @@ import org.slf4j.LoggerFactory;
 @Contract(threading = ThreadingBehavior.IMMUTABLE_CONDITIONAL)
 public final class AsyncConnectExec implements AsyncExecChainHandler {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private final Logger log = LogManager.getLogger(getClass());
 
     private final HttpProcessor proxyHttpProcessor;
     private final AuthenticationStrategy proxyAuthStrategy;
@@ -119,7 +118,6 @@ public final class AsyncConnectExec implements AsyncExecChainHandler {
 
         final String exchangeId = scope.exchangeId;
         final HttpRoute route = scope.route;
-        final CancellableDependency cancellableDependency = scope.cancellableDependency;
         final HttpClientContext clientContext = scope.clientContext;
         final AsyncExecRuntime execRuntime = scope.execRuntime;
         final State state = new State(route);
@@ -149,25 +147,24 @@ public final class AsyncConnectExec implements AsyncExecChainHandler {
             if (log.isDebugEnabled()) {
                 log.debug(exchangeId + ": acquiring connection with route " + route);
             }
-            cancellableDependency.setDependency(execRuntime.acquireConnection(
-                    route, userToken, clientContext, new FutureCallback<AsyncExecRuntime>() {
+            execRuntime.acquireConnection(route, userToken, clientContext, new FutureCallback<AsyncExecRuntime>() {
 
-                        @Override
-                        public void completed(final AsyncExecRuntime execRuntime) {
-                            routeInitiation.run();
-                        }
+                @Override
+                public void completed(final AsyncExecRuntime execRuntime) {
+                    routeInitiation.run();
+                }
 
-                        @Override
-                        public void failed(final Exception ex) {
-                            asyncExecCallback.failed(ex);
-                        }
+                @Override
+                public void failed(final Exception ex) {
+                    asyncExecCallback.failed(ex);
+                }
 
-                        @Override
-                        public void cancelled() {
-                            asyncExecCallback.failed(new InterruptedIOException());
-                        }
+                @Override
+                public void cancelled() {
+                    asyncExecCallback.failed(new InterruptedIOException());
+                }
 
-                    }));
+            });
         } else {
             routeInitiation.run();
         }
@@ -184,7 +181,6 @@ public final class AsyncConnectExec implements AsyncExecChainHandler {
         final RouteTracker tracker = state.tracker;
         final AsyncExecRuntime execRuntime = scope.execRuntime;
         final HttpRoute route = scope.route;
-        final CancellableDependency operation = scope.cancellableDependency;
         final HttpClientContext clientContext = scope.clientContext;
 
         int step;
@@ -193,7 +189,7 @@ public final class AsyncConnectExec implements AsyncExecChainHandler {
             step = routeDirector.nextStep(route, fact);
             switch (step) {
                 case HttpRouteDirector.CONNECT_TARGET:
-                    operation.setDependency(execRuntime.connect(clientContext, new FutureCallback<AsyncExecRuntime>() {
+                    execRuntime.connect(clientContext, new FutureCallback<AsyncExecRuntime>() {
 
                         @Override
                         public void completed(final AsyncExecRuntime execRuntime) {
@@ -212,11 +208,11 @@ public final class AsyncConnectExec implements AsyncExecChainHandler {
                             asyncExecCallback.failed(new InterruptedIOException());
                         }
 
-                    }));
+                    });
                     return;
 
                 case HttpRouteDirector.CONNECT_PROXY:
-                    operation.setDependency(execRuntime.connect(clientContext, new FutureCallback<AsyncExecRuntime>() {
+                    execRuntime.connect(clientContext, new FutureCallback<AsyncExecRuntime>() {
 
                         @Override
                         public void completed(final AsyncExecRuntime execRuntime) {
@@ -236,7 +232,7 @@ public final class AsyncConnectExec implements AsyncExecChainHandler {
                             asyncExecCallback.failed(new InterruptedIOException());
                         }
 
-                    }));
+                    });
                     return;
 
                 case HttpRouteDirector.TUNNEL_TARGET:

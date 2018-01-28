@@ -31,17 +31,19 @@ import java.net.InetAddress;
 
 import org.apache.hc.client5.http.HttpRoute;
 import org.apache.hc.client5.http.SchemePortResolver;
+import org.apache.hc.client5.http.UnsupportedSchemeException;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.DefaultSchemePortResolver;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
 import org.apache.hc.client5.http.routing.HttpRoutePlanner;
-import org.apache.hc.client5.http.routing.RoutingSupport;
 import org.apache.hc.core5.annotation.Contract;
 import org.apache.hc.core5.annotation.ThreadingBehavior;
 import org.apache.hc.core5.http.HttpException;
 import org.apache.hc.core5.http.HttpHost;
+import org.apache.hc.core5.http.HttpRequest;
 import org.apache.hc.core5.http.ProtocolException;
 import org.apache.hc.core5.http.protocol.HttpContext;
+import org.apache.hc.core5.net.URIAuthority;
 
 /**
  * Default implementation of an {@link HttpRoutePlanner}. It will not make use of
@@ -56,29 +58,55 @@ public class DefaultRoutePlanner implements HttpRoutePlanner {
 
     public DefaultRoutePlanner(final SchemePortResolver schemePortResolver) {
         super();
-        this.schemePortResolver = schemePortResolver != null ? schemePortResolver : DefaultSchemePortResolver.INSTANCE;
+        this.schemePortResolver = schemePortResolver != null ? schemePortResolver :
+            DefaultSchemePortResolver.INSTANCE;
     }
 
     @Override
-    public final HttpRoute determineRoute(final HttpHost host, final HttpContext context) throws HttpException {
+    public HttpRoute determineRoute(final HttpHost host, final HttpContext context) throws HttpException {
         if (host == null) {
             throw new ProtocolException("Target host is not specified");
         }
         final HttpClientContext clientContext = HttpClientContext.adapt(context);
         final RequestConfig config = clientContext.getRequestConfig();
+        final InetAddress local = config.getLocalAddress();
         HttpHost proxy = config.getProxy();
         if (proxy == null) {
             proxy = determineProxy(host, context);
         }
-        final HttpHost target = RoutingSupport.normalize(host, schemePortResolver);
-        if (target.getPort() < 0) {
-            throw new ProtocolException("Unroutable protocol scheme: " + target);
+
+        final HttpHost target;
+        if (host.getPort() <= 0) {
+            try {
+                target = new HttpHost(
+                        host.getHostName(),
+                        this.schemePortResolver.resolve(host),
+                        host.getSchemeName());
+            } catch (final UnsupportedSchemeException ex) {
+                throw new HttpException(ex.getMessage());
+            }
+        } else {
+            target = host;
         }
         final boolean secure = target.getSchemeName().equalsIgnoreCase("https");
         if (proxy == null) {
-            return new HttpRoute(target, determineLocalAddress(target, context), secure);
+            return new HttpRoute(target, local, secure);
         } else {
-            return new HttpRoute(target, determineLocalAddress(proxy, context), proxy, secure);
+            return new HttpRoute(target, local, proxy, secure);
+        }
+    }
+
+    @Override
+    public HttpHost determineTargetHost(final HttpRequest request, final HttpContext context) throws HttpException {
+        final URIAuthority authority = request.getAuthority();
+        if (authority != null) {
+            final String scheme = request.getScheme();
+            if (scheme == null) {
+                throw new ProtocolException("Protocol scheme is not specified");
+            }
+            return new HttpHost(authority, scheme);
+        } else {
+            return null;
         }
     }
 
@@ -89,17 +117,6 @@ public class DefaultRoutePlanner implements HttpRoutePlanner {
      */
     protected HttpHost determineProxy(
             final HttpHost target,
-            final HttpContext context) throws HttpException {
-        return null;
-    }
-
-    /**
-     * This implementation returns null.
-     *
-     * @throws HttpException may be thrown if overridden
-     */
-    protected InetAddress determineLocalAddress(
-            final HttpHost firstHop,
             final HttpContext context) throws HttpException {
         return null;
     }

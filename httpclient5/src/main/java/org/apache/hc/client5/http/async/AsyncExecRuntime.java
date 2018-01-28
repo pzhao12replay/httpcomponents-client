@@ -30,7 +30,6 @@ package org.apache.hc.client5.http.async;
 import org.apache.hc.client5.http.HttpRoute;
 import org.apache.hc.client5.http.protocol.HttpClientContext;
 import org.apache.hc.core5.annotation.Internal;
-import org.apache.hc.core5.concurrent.Cancellable;
 import org.apache.hc.core5.concurrent.FutureCallback;
 import org.apache.hc.core5.http.nio.AsyncClientExchangeHandler;
 import org.apache.hc.core5.util.TimeValue;
@@ -49,7 +48,7 @@ public interface AsyncExecRuntime {
 
     boolean isConnectionAcquired();
 
-    Cancellable acquireConnection(
+    void acquireConnection(
             HttpRoute route,
             Object state,
             HttpClientContext clientContext,
@@ -59,11 +58,11 @@ public interface AsyncExecRuntime {
 
     void discardConnection();
 
-    boolean validateConnection();
-
     boolean isConnected();
 
-    Cancellable connect(
+    void disconnect();
+
+    void connect(
             HttpClientContext clientContext,
             FutureCallback<AsyncExecRuntime> callback);
 
@@ -72,14 +71,20 @@ public interface AsyncExecRuntime {
     /**
      * Initiates a message exchange using the given handler.
      */
-    Cancellable execute(
+    void execute(
             AsyncClientExchangeHandler exchangeHandler,
             HttpClientContext context);
 
-    void markConnectionReusable(Object state, TimeValue duration);
+    boolean validateConnection();
+
+    boolean isConnectionReusable();
+
+    void markConnectionReusable();
 
     void markConnectionNonReusable();
 
-    AsyncExecRuntime fork();
+    void setConnectionState(Object state);
+
+    void setConnectionValidFor(TimeValue duration);
 
 }

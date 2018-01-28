@@ -31,7 +31,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import org.apache.hc.client5.http.cache.HttpCacheEntry;
-import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.sync.methods.HttpGet;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHost;
 import org.apache.hc.core5.http.HttpRequest;
@@ -49,7 +49,7 @@ public class TestCacheKeyGenerator {
             "/full_episodes");
     private static final BasicHttpRequest REQUEST_ROOT = new BasicHttpRequest("GET", "/");
 
-    private CacheKeyGenerator extractor;
+    CacheKeyGenerator extractor;
     private HttpHost defaultHost;
     private HttpCacheEntry mockEntry;
     private HttpRequest mockRequest;
@@ -59,7 +59,7 @@ public class TestCacheKeyGenerator {
         defaultHost = new HttpHost("foo.example.com");
         mockEntry = mock(HttpCacheEntry.class);
         mockRequest = mock(HttpRequest.class);
-        extractor = CacheKeyGenerator.INSTANCE;
+        extractor = new CacheKeyGenerator();
     }
 
     @Test
@@ -120,14 +120,14 @@ public class TestCacheKeyGenerator {
         when(mockEntry.hasVariants()).thenReturn(false);
         extractor = new CacheKeyGenerator() {
             @Override
-            public String generateKey(final HttpHost h, final HttpRequest request) {
+            public String generateKey(final HttpHost h, final HttpRequest req) {
                 Assert.assertSame(defaultHost, h);
-                Assert.assertSame(mockRequest, request);
+                Assert.assertSame(mockRequest, req);
                 return theURI;
             }
         };
 
-        final String result = extractor.generateKey(defaultHost, mockRequest, mockEntry);
+        final String result = extractor.generateVariantURI(defaultHost, mockRequest, mockEntry);
         verify(mockEntry).hasVariants();
         Assert.assertSame(theURI, result);
     }
@@ -140,9 +140,9 @@ public class TestCacheKeyGenerator {
 
         extractor = new CacheKeyGenerator() {
             @Override
-            public String generateKey(final HttpHost h, final HttpRequest request) {
+            public String generateKey(final HttpHost h, final HttpRequest req) {
                 Assert.assertSame(defaultHost, h);
-                Assert.assertSame(mockRequest, request);
+                Assert.assertSame(mockRequest, req);
                 return theURI;
             }
         };
@@ -150,7 +150,7 @@ public class TestCacheKeyGenerator {
         when(mockEntry.headerIterator("Vary")).thenReturn(new BasicHeaderIterator(varyHeaders, "Vary"));
         when(mockRequest.getHeaders("Accept-Encoding")).thenReturn(encHeaders);
 
-        final String result = extractor.generateKey(defaultHost, mockRequest, mockEntry);
+        final String result = extractor.generateVariantURI(defaultHost, mockRequest, mockEntry);
 
         verify(mockEntry).hasVariants();
         verify(mockEntry).headerIterator("Vary");
@@ -165,9 +165,9 @@ public class TestCacheKeyGenerator {
         final Header[] varyHeaders = { new BasicHeader("Vary", "Accept-Encoding") };
         extractor = new CacheKeyGenerator() {
             @Override
-            public String generateKey(final HttpHost h, final HttpRequest request) {
+            public String generateKey(final HttpHost h, final HttpRequest req) {
                 Assert.assertSame(defaultHost, h);
-                Assert.assertSame(mockRequest, request);
+                Assert.assertSame(mockRequest, req);
                 return theURI;
             }
         };
@@ -176,7 +176,7 @@ public class TestCacheKeyGenerator {
         when(mockRequest.getHeaders("Accept-Encoding"))
                 .thenReturn(noHeaders);
 
-        final String result = extractor.generateKey(defaultHost, mockRequest, mockEntry);
+        final String result = extractor.generateVariantURI(defaultHost, mockRequest, mockEntry);
 
         verify(mockEntry).hasVariants();
         verify(mockEntry).headerIterator("Vary");
@@ -192,9 +192,9 @@ public class TestCacheKeyGenerator {
         final Header[] uaHeaders = { new BasicHeader("User-Agent", "browser") };
         extractor = new CacheKeyGenerator() {
             @Override
-            public String generateKey(final HttpHost h, final HttpRequest request) {
+            public String generateKey(final HttpHost h, final HttpRequest req) {
                 Assert.assertSame(defaultHost, h);
-                Assert.assertSame(mockRequest, request);
+                Assert.assertSame(mockRequest, req);
                 return theURI;
             }
         };
@@ -203,7 +203,7 @@ public class TestCacheKeyGenerator {
         when(mockRequest.getHeaders("Accept-Encoding")).thenReturn(encHeaders);
         when(mockRequest.getHeaders("User-Agent")).thenReturn(uaHeaders);
 
-        final String result = extractor.generateKey(defaultHost, mockRequest, mockEntry);
+        final String result = extractor.generateVariantURI(defaultHost, mockRequest, mockEntry);
 
         verify(mockEntry).hasVariants();
         verify(mockEntry).headerIterator("Vary");
@@ -221,9 +221,9 @@ public class TestCacheKeyGenerator {
         final Header[] uaHeaders = { new BasicHeader("User-Agent", "browser") };
         extractor = new CacheKeyGenerator() {
             @Override
-            public String generateKey(final HttpHost h, final HttpRequest request) {
+            public String generateKey(final HttpHost h, final HttpRequest req) {
                 Assert.assertSame(defaultHost, h);
-                Assert.assertSame(mockRequest, request);
+                Assert.assertSame(mockRequest, req);
                 return theURI;
             }
         };
@@ -232,7 +232,7 @@ public class TestCacheKeyGenerator {
         when(mockRequest.getHeaders("Accept-Encoding")).thenReturn(encHeaders);
         when(mockRequest.getHeaders("User-Agent")).thenReturn(uaHeaders);
 
-        final String result = extractor.generateKey(defaultHost, mockRequest, mockEntry);
+        final String result = extractor.generateVariantURI(defaultHost, mockRequest, mockEntry);
 
         verify(mockEntry).hasVariants();
         verify(mockEntry).headerIterator("Vary");
@@ -250,9 +250,9 @@ public class TestCacheKeyGenerator {
         final Header[] uaHeaders = { new BasicHeader("User-Agent", "browser") };
         extractor = new CacheKeyGenerator() {
             @Override
-            public String generateKey(final HttpHost h, final HttpRequest request) {
+            public String generateKey(final HttpHost h, final HttpRequest req) {
                 Assert.assertSame(defaultHost, h);
-                Assert.assertSame(mockRequest, request);
+                Assert.assertSame(mockRequest, req);
                 return theURI;
             }
         };
@@ -261,7 +261,7 @@ public class TestCacheKeyGenerator {
         when(mockRequest.getHeaders("Accept-Encoding")).thenReturn(encHeaders);
         when(mockRequest.getHeaders("User-Agent")).thenReturn(uaHeaders);
 
-        final String result = extractor.generateKey(defaultHost, mockRequest, mockEntry);
+        final String result = extractor.generateVariantURI(defaultHost, mockRequest, mockEntry);
 
         verify(mockEntry).hasVariants();
         verify(mockEntry).headerIterator("Vary");

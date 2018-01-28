@@ -28,8 +28,6 @@
 package org.apache.hc.client5.http.ssl;
 
 import java.net.SocketAddress;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -58,8 +56,8 @@ import org.apache.hc.core5.reactor.ssl.TransportSecurityLayer;
 import org.apache.hc.core5.ssl.SSLContexts;
 import org.apache.hc.core5.util.Args;
 import org.apache.hc.core5.util.TextUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Default SSL upgrade strategy for non-blocking connections.
@@ -75,14 +73,6 @@ public class H2TlsStrategy implements TlsStrategy {
         return s.split(" *, *");
     }
 
-    private static String getProperty(final String key) {
-        return AccessController.doPrivileged(new PrivilegedAction<String>() {
-            @Override
-            public String run() {
-                return System.getProperty(key);
-            }
-        });
-    }
     public static HostnameVerifier getDefaultHostnameVerifier() {
         return new DefaultHostnameVerifier(PublicSuffixMatcherLoader.getDefault());
     }
@@ -96,13 +86,13 @@ public class H2TlsStrategy implements TlsStrategy {
     public static TlsStrategy getSystemDefault() {
         return new H2TlsStrategy(
                 SSLContexts.createSystemDefault(),
-                split(getProperty("https.protocols")),
-                split(getProperty("https.cipherSuites")),
+                split(System.getProperty("https.protocols")),
+                split(System.getProperty("https.cipherSuites")),
                 SSLBufferManagement.STATIC,
                 getDefaultHostnameVerifier());
     }
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private final Logger log = LogManager.getLogger(getClass());
 
     private final SSLContext sslContext;
     private final String[] supportedProtocols;

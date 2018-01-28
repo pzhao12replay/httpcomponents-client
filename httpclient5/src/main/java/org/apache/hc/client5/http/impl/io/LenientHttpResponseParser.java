@@ -36,8 +36,8 @@ import org.apache.hc.core5.http.config.H1Config;
 import org.apache.hc.core5.http.impl.io.DefaultHttpResponseParser;
 import org.apache.hc.core5.http.message.LineParser;
 import org.apache.hc.core5.util.CharArrayBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Lenient HTTP response parser implementation that can skip malformed data until
@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
  */
 public class LenientHttpResponseParser extends DefaultHttpResponseParser {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
+    private final Logger log = LogManager.getLogger(getClass());
 
     /**
      * Creates new instance of DefaultHttpResponseParser.
